@@ -1,0 +1,13 @@
+dist/Tests.exe
+dist/LiveConnectionTest.exe
+dist/PortBridge.exe
+dist/PortBridge-v1.1.exe
+dist/PortBridge-v1.2.exe
+dist/PortBridge-v1.3.exe
+dist/PortBridge-Win11.zip
+dist/PortBridge-Win11-v1.1.zip
+dist/PortBridge-Win11-v1.2.zip
+dist/PortBridge-Win11-v1.3.zip
+premium-audit.json
+ui-audit.json
+*.tmp

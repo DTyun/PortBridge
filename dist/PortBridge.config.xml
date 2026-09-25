@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Settings>
+  <!-- 本机监听地址、端口 -->
+  <ListenAddress>127.0.0.1</ListenAddress>
+  <!-- 多个端口用逗号分隔，例如 7890,7891,7892 -->
+  <ListenPorts>7890</ListenPorts>
+  <!-- 目标代理实际监听的地址、端口，请按需修改 -->
+  <TargetAddress>127.0.0.1</TargetAddress>
+  <TargetPort>23578</TargetPort>
+  <Tcp>true</Tcp>
+  <Udp>true</Udp>
+  <!-- 打开软件时是否自动转发 -->
+  <AutoRelay>false</AutoRelay>
+</Settings>
