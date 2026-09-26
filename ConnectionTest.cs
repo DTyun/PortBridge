@@ -128,6 +128,7 @@ namespace PortBridge {
     public sealed class ConnectionTestForm : Form {
         readonly TextBox url, output;
         readonly Label result;
+        readonly PictureBox resultGlyph;
         readonly Button run, cancel;
         readonly Settings settings;
         readonly bool alreadyRunning;
@@ -137,12 +138,18 @@ namespace PortBridge {
             settings = value; alreadyRunning = running;
             Text = "测试连接 · PortBridge"; Font = Theme.Body; BackColor = Theme.Background; ForeColor = Theme.Ink;
             ClientSize = new Size(760, 540); MinimumSize = new Size(680, 500); StartPosition = FormStartPosition.CenterParent; AutoScaleMode = AutoScaleMode.Dpi;
+            Icon = IconArtwork.CreateIcon(IconState.App, 32);
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20), ColumnCount = 1, RowCount = 5 };
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             layout.Controls.Add(new Label { Text = "外网测试网址（通过当前中转访问）", AutoSize = true }, 0, 0);
             url = new TextBox { Text = "https://www.gstatic.com/generate_204", Dock = DockStyle.Fill, AccessibleName = "外网测试网址" }; layout.Controls.Add(url, 0, 1);
             output = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill, BackColor = Color.White, AccessibleName = "连接测试日志" }; layout.Controls.Add(output, 0, 2);
-            result = new Label { Text = "准备测试……", Dock = DockStyle.Fill, Padding = new Padding(0, 10, 0, 0), AccessibleName = "测试结果" }; layout.Controls.Add(result, 0, 3);
+            var resultPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Theme.Surface, Margin = new Padding(0) };
+            resultPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 38)); resultPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            resultGlyph = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, AccessibleName = "连接结果图标" };
+            result = new Label { Text = "正在准备测试……", Dock = DockStyle.Fill, Padding = new Padding(2, 0, 0, 0), AccessibleName = "测试结果", TextAlign = ContentAlignment.MiddleLeft };
+            resultPanel.Controls.Add(resultGlyph, 0, 0); resultPanel.Controls.Add(result, 1, 0); layout.Controls.Add(resultPanel, 0, 3);
+            SetResultIcon(IconState.Starting);
             var actions = new FlowLayoutPanel { Dock = DockStyle.Fill };
             run = new Button { Text = "重新测试", Size = new Size(130, 36) }; cancel = new Button { Text = "取消测试", Size = new Size(130, 36) };
             actions.Controls.Add(run); actions.Controls.Add(cancel); layout.Controls.Add(actions, 0, 4); Controls.Add(layout);
@@ -153,16 +160,18 @@ namespace PortBridge {
         void Append(string line) { if (!IsDisposed) output.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + line + Environment.NewLine); }
         async Task RunTest() {
             if (busy) return;
-            busy = true; run.Enabled = url.Enabled = false; cancel.Enabled = true; cancel.Text = "取消测试"; output.Clear(); result.Text = "正在测试，请稍候……"; result.ForeColor = Theme.Muted;
+            busy = true; run.Enabled = url.Enabled = false; cancel.Enabled = true; cancel.Text = "取消测试"; output.Clear(); result.Text = "正在测试，请稍候……"; result.ForeColor = Theme.Muted; SetResultIcon(IconState.Starting);
             cancellation = new CancellationTokenSource(); string address = url.Text.Trim();
             var progress = new Progress<string>(Append);
             bool passed = false;
             try { passed = await Task.Run(() => new ConnectionTester().Run(settings, alreadyRunning, address, line => ((IProgress<string>)progress).Report(line), cancellation.Token)); }
             catch (Exception e) { Append("测试不通过：" + e.Message); }
             bool cancelled = cancellation.IsCancellationRequested; cancellation.Dispose(); cancellation = null; busy = false;
-            result.Text = cancelled ? "测试已取消" : passed ? "✓ 测试通过：所有监听端口均可访问测试网站" : "✕ 测试不通过：请查看上方各端口日志";
+            result.Text = cancelled ? "测试已取消" : passed ? "测试通过：所有监听端口均可访问测试网站" : "测试不通过：请查看上方各端口日志";
             result.ForeColor = cancelled ? Theme.Muted : passed ? Theme.Good : Theme.Error;
+            SetResultIcon(cancelled ? IconState.Paused : passed ? IconState.Success : IconState.Failure);
             run.Enabled = url.Enabled = cancel.Enabled = true; cancel.Text = "关闭";
         }
+        void SetResultIcon(IconState state) { var old = resultGlyph.Image; resultGlyph.Image = IconArtwork.CreateBitmap(state, 32); if (old != null) old.Dispose(); }
     }
 }

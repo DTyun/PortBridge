@@ -21,7 +21,7 @@ Windows 11 本地端口转发工具，单文件 exe，无需安装，使用系�
 
 v1.4 重新整理了主窗口：先看懂“本机入口 → 目标服务”，再按步骤保存、启动、测试；每个区域都有一句说明，日志和流量统计固定在底部。
 
-1. 将 [`dist/PortBridge-v1.4.exe`](dist/PortBridge-v1.4.exe) 放到固定位置并双击打开。升级前先从旧版托盘菜单选择「退出软件」。
+1. 将 [`dist/PortBridge-v1.4.exe`](dist/PortBridge-v1.4.exe) 放到固定位置并双击打开。升级前先从旧版托盘菜单选择「退出软件」。程序使用 PortBridge 桌面图标，状态图标会随启动、运行、暂停和连接测试结果变化。
 2. 默认监听 `127.0.0.1:7890`，目标为 `127.0.0.1:23578`。确认目标程序已经监听 23578。
 3. 选择 TCP、UDP 或两者，点击「启动转发」。需要让使用方连接 7890，数据才会经过中转。
 4. 「暂停转发」会关闭所有现有连接并释放监听端口。暂停后可修改设置，再次启动。
@@ -71,6 +71,8 @@ v1.4 重新整理了主窗口：先看懂“本机入口 → 目标服务”，�
 
 ## 下载
 
+主窗口底部显示当前版本号与 GitHub 开源地址。点击版本号打开发布版本页面，点击开源地址在默认浏览器打开 [DTyun/PortBridge](https://github.com/DTyun/PortBridge)。
+
 优先下载带有 README 和示例配置的完整包：[`PortBridge-Win11-v1.4.zip`](dist/PortBridge-Win11-v1.4.zip)。也可以只下载 [`PortBridge-v1.4.exe`](dist/PortBridge-v1.4.exe)。GitHub Releases 中会同步提供同一个 zip 文件。
 
 ## 从源码构建
@@ -82,13 +84,18 @@ v1.4 重新整理了主窗口：先看懂“本机入口 → 目标服务”，�
 .\test.ps1
 ```
 
-构建产物位于 `dist/PortBridge-v1.4.exe`。`test.ps1` 会运行 64 项测试，覆盖多端口 TCP/UDP 转发、端口冲突回滚、配置导入导出、HTTP CONNECT/SOCKS5 外网诊断、暂停重启和托盘窗口行为。
+构建会生成 `assets/` 中的桌面与状态 ICO，将桌面图标嵌入 exe，并更新 `dist/PortBridge-Win11-v1.4.zip`（含 exe、配置示例和图标文件）。主程序位于 `dist/PortBridge-v1.4.exe`。
+
+`test.ps1` 会运行 67 项检查，覆盖多端口 TCP/UDP 转发、端口冲突回滚、配置导入导出、HTTP CONNECT/SOCKS5 外网诊断、暂停重启、托盘窗口行为，以及 100%、125%、150% 程序化布局缩放下的控件遮挡检查。
 
 ## 项目结构
 
 | 文件 | 作用 |
 | --- | --- |
 | `Program.cs` | 中文 WinForms 界面、托盘、配置导入导出、开机启动 |
+| `IconArtwork.cs` | 端口箭头图形、运行状态图标和多尺寸 ICO 生成 |
+| `IconAssetGenerator.cs` | 构建时生成桌面与状态 ICO 文件 |
+| `assets/*.ico` | 桌面、启动中、运行、暂停、连接成功和失败图标 |
 | `RelayEngine.cs` | TCP/UDP 转发引擎和多端口分组启动 |
 | `ConnectionTest.cs` | HTTP CONNECT / SOCKS5 外网链路测试窗口 |
 | `PortBridge.config.xml` | 可编辑的示例配置 |

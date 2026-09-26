@@ -14,6 +14,20 @@ class Tests {
     static int checks;
     static readonly Random portRandom = new Random();
     static void Assert(bool ok, string name) { if (!ok) throw new Exception(name); checks++; Console.WriteLine("PASS " + name); }
+    static void CheckLayout(Control parent) {
+        foreach (Control control in parent.Controls) {
+            if (!control.Visible) continue;
+            if (control is ButtonBase || control is TextBoxBase || control is NumericUpDown || control is Label) {
+                Rectangle bounds = control.RectangleToScreen(control.ClientRectangle);
+                for (Control ancestor = control.Parent; ancestor != null; ancestor = ancestor.Parent) {
+                    Rectangle available = ancestor.RectangleToScreen(ancestor.ClientRectangle);
+                    if (!available.Contains(bounds)) throw new Exception("Clipped control: " + control.Text + " in " + ancestor.GetType().Name);
+                }
+                if (control is CheckBox && control.GetPreferredSize(Size.Empty).Width > control.Width)
+                    throw new Exception("Clipped checkbox label: " + control.Text);
+            } else CheckLayout(control);
+        }
+    }
     static int FreePort() {
         for (int i = 0; i < 512; i++) {
             int p = portRandom.Next(15000, 60000); var l = new TcpListener(IPAddress.Loopback, p);
@@ -182,6 +196,11 @@ class Tests {
                 form.Show(); Application.DoEvents();
                 using (var bitmap = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size)); bitmap.Save("ui-preview.png"); }
                 Assert(form.Visible, "native form renders");
+                CheckLayout(form); Assert(true, "all form fields, labels and actions fit at 100 percent");
+                form.Scale(new SizeF(1.25F, 1.25F)); Application.DoEvents();
+                CheckLayout(form); Assert(true, "all form fields, labels and actions fit at 125 percent layout scale");
+                form.Scale(new SizeF(1.2F, 1.2F)); Application.DoEvents();
+                CheckLayout(form); Assert(true, "all form fields, labels and actions fit at 150 percent layout scale");
                 form.WindowState = FormWindowState.Minimized; Application.DoEvents(); Assert(!form.Visible, "minimize hides to tray");
                 form.Restore(); Application.DoEvents(); Assert(form.Visible && form.WindowState == FormWindowState.Normal, "restore from tray");
                 form.Close(); Application.DoEvents(); Assert(!form.IsDisposed && !form.Visible, "window close keeps tray process alive");

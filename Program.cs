@@ -98,6 +98,7 @@ namespace PortBridge {
         CheckBox tcp, udp, startup, auto;
         Button toggle, save, import;
         Label status, stats, feedback;
+        PictureBox statusGlyph;
         NotifyIcon tray;
         ToolStripMenuItem trayToggle;
         RelayGroup engine;
@@ -115,77 +116,82 @@ namespace PortBridge {
                 settings = initialSettings ?? (File.Exists(Settings.FilePath) ? Settings.Load() : File.Exists(bundled) ? Settings.Read(bundled) : new Settings());
             } catch (Exception e) { settings = new Settings(); loadError = "读取配置失败，已使用默认值：" + e.Message; }
 
-            Text = "PortBridge · 端口中转"; ClientSize = new Size(820, 860); MinimumSize = new Size(760, 800);
-            Font = Theme.Body; BackColor = Theme.Background; ForeColor = Theme.Ink; AutoScaleMode = AutoScaleMode.Dpi;
-            StartPosition = FormStartPosition.CenterScreen; Icon = MakeIcon();
-            var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(28, 22, 28, 24), ColumnCount = 1, RowCount = 7 };
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 238));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 112));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
+            Text = "PortBridge · 端口中转"; ClientSize = new Size(820, 720); FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false;
+            Font = Theme.Body; BackColor = Theme.Background; ForeColor = Theme.Ink; AutoScaleDimensions = new SizeF(96F, 96F); AutoScaleMode = AutoScaleMode.Dpi;
+            StartPosition = FormStartPosition.CenterScreen; Icon = IconArtwork.CreateIcon(IconState.Paused, 32);
+            var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20, 16, 20, 12), ColumnCount = 1, RowCount = 8 };
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 164));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 116));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 100));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
             Controls.Add(root);
 
-            var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, BackColor = Color.Transparent };
-            header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70)); header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30));
-            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 37)); header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            var title = new Label { Text = "端口中转", Font = new Font("Microsoft YaHei UI", 24F, FontStyle.Bold), AutoSize = true, Margin = new Padding(0) };
-            header.Controls.Add(title, 0, 0); header.SetColumnSpan(title, 1);
-            header.Controls.Add(new Label { Text = "把本机端口的流量转发到另一个服务", ForeColor = Theme.Muted, AutoSize = true, Margin = new Padding(2, 2, 0, 0) }, 0, 1);
-            status = new Label { Text = "●  已暂停", ForeColor = Theme.Muted, Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleRight, Dock = DockStyle.Fill, AccessibleName = "转发状态" };
-            header.Controls.Add(status, 1, 0); header.SetRowSpan(status, 2); root.Controls.Add(header, 0, 0);
+            var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 2, BackColor = Color.Transparent };
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58)); header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34)); header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 36));
+            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            var title = new Label { Text = "端口中转", Font = new Font("Microsoft YaHei UI", 20F, FontStyle.Bold), AutoSize = true, Margin = new Padding(0) };
+            header.Controls.Add(title, 0, 0);
+            header.Controls.Add(new Label { Text = "本机入口 → 目标服务", ForeColor = Theme.Muted, AutoSize = true, Margin = new Padding(2, 0, 0, 0) }, 0, 1);
+            status = new Label { Text = "已暂停", ForeColor = Theme.Muted, Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleRight, Dock = DockStyle.Fill, AccessibleName = "转发状态" };
+            header.Controls.Add(status, 1, 0); header.SetRowSpan(status, 2);
+            statusGlyph = new PictureBox { Size = new Size(26, 26), SizeMode = PictureBoxSizeMode.Zoom, Anchor = AnchorStyles.Right | AnchorStyles.Top, Margin = new Padding(0, 2, 0, 0), AccessibleName = "转发状态图标" };
+            header.Controls.Add(statusGlyph, 2, 0); header.SetRowSpan(statusGlyph, 2); root.Controls.Add(header, 0, 0);
 
-            var guide = new Panel { Dock = DockStyle.Fill, BackColor = Theme.AccentSoft, Padding = new Padding(14, 9, 14, 8) };
-            guide.Controls.Add(new Label { Text = "使用方法：填写入口和目标 → 先保存设置 → 点击启动。第一次使用建议点击“测试连接”。", ForeColor = Theme.Ink, AutoSize = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft });
+            var guide = new Panel { Dock = DockStyle.Fill, BackColor = Theme.AccentSoft, Padding = new Padding(12, 5, 12, 5) };
+            guide.Controls.Add(new Label { Text = "填写两端地址，选择协议，再启动转发；测试连接可检查网页链路。", ForeColor = Theme.Ink, AutoSize = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft });
             root.Controls.Add(guide, 0, 1);
 
-            var route = Card(); route.Padding = new Padding(18, 14, 18, 16);
-            var routeGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 4 };
+            var route = Card(); route.Padding = new Padding(14, 10, 14, 12);
+            var routeGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 3, Margin = new Padding(0) };
             routeGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46)); routeGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 64)); routeGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 54));
-            routeGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 35)); routeGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 31)); routeGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 48)); routeGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            var fromTitle = new Label { Text = "01  本机入口", Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Theme.Accent };
-            var toTitle = new Label { Text = "02  目标服务", Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold), AutoSize = true, ForeColor = Theme.Accent };
+            routeGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 32)); routeGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 46)); routeGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            var fromTitle = new Label { Text = "本机入口", Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold), AutoSize = true, ForeColor = Theme.Accent };
+            var toTitle = new Label { Text = "目标服务", Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold), AutoSize = true, ForeColor = Theme.Accent };
             routeGrid.Controls.Add(fromTitle, 0, 0); routeGrid.Controls.Add(toTitle, 2, 0);
-            routeGrid.Controls.Add(new Label { Text = "用户连接这里，软件接收流量", ForeColor = Theme.Muted, AutoSize = true }, 0, 1);
-            routeGrid.Controls.Add(new Label { Text = "软件把流量送到这里", ForeColor = Theme.Muted, AutoSize = true }, 2, 1);
             listen = Field(settings.ListenAddress, "监听 IP 地址"); target = Field(settings.TargetAddress, "目标 IP 地址");
             listenPort = Field(settings.PortsText(), "监听端口，多个用逗号分隔，例如 7890,7891"); listenPort.MaxLength = 512; targetPort = Port(settings.TargetPort, "目标端口");
-            routeGrid.Controls.Add(listen, 0, 2); routeGrid.Controls.Add(target, 2, 2); routeGrid.Controls.Add(listenPort, 0, 3); routeGrid.Controls.Add(targetPort, 2, 3);
+            routeGrid.Controls.Add(LabeledField("地址", listen), 0, 1); routeGrid.Controls.Add(LabeledField("地址", target), 2, 1);
+            routeGrid.Controls.Add(LabeledField("端口", listenPort), 0, 2); routeGrid.Controls.Add(LabeledField("端口", targetPort), 2, 2);
             var arrow = new Label { Text = "→", Font = new Font("Segoe UI", 26F, FontStyle.Bold), ForeColor = Theme.Accent, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter };
-            routeGrid.Controls.Add(arrow, 1, 2); routeGrid.SetRowSpan(arrow, 2); route.Controls.Add(routeGrid); root.Controls.Add(route, 0, 2);
+            routeGrid.Controls.Add(arrow, 1, 1); routeGrid.SetRowSpan(arrow, 2); route.Controls.Add(routeGrid); root.Controls.Add(route, 0, 2);
 
-            var options = Card(); options.Padding = new Padding(18, 12, 18, 10);
+            var options = Card(); options.Padding = new Padding(14, 8, 14, 6);
             var optionGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
             optionGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); optionGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
-            optionGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 31)); optionGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            optionGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); optionGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             optionGrid.Controls.Add(new Label { Text = "传输方式", Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold), AutoSize = true }, 0, 0);
             optionGrid.Controls.Add(new Label { Text = "启动选项", Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold), AutoSize = true }, 1, 0);
-            var protocols = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, AutoSize = false };
+            var protocolStack = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = new Padding(0) };
+            protocolStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); protocolStack.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            var protocols = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, AutoSize = false, Margin = new Padding(0) };
             tcp = Check("TCP", settings.Tcp); udp = Check("UDP", settings.Udp); protocols.Controls.Add(tcp); protocols.Controls.Add(udp);
-            protocols.Controls.Add(new Label { Text = "常用代理一般选 TCP + UDP", AutoSize = true, ForeColor = Theme.Muted, Margin = new Padding(10, 3, 0, 0) }); optionGrid.Controls.Add(protocols, 0, 1);
-            var startupOptions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            protocolStack.Controls.Add(protocols, 0, 0);
+            protocolStack.Controls.Add(new Label { Text = "多个入口端口用逗号分隔", AutoSize = true, ForeColor = Theme.Muted, Margin = new Padding(0, 3, 0, 0) }, 0, 1); optionGrid.Controls.Add(protocolStack, 0, 1);
+            var startupOptions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = new Padding(0) };
+            startupOptions.RowStyles.Add(new RowStyle(SizeType.Percent, 50)); startupOptions.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
             startup = Check("登录 Windows 后自动打开", false); auto = Check("打开后自动启动转发", settings.AutoRelay);
             try { startup.Checked = Startup.Enabled; } catch (Exception e) { loadError = "读取开机启动设置失败：" + e.Message; }
             startupOptions.Controls.Add(startup); startupOptions.Controls.Add(auto); optionGrid.Controls.Add(startupOptions, 1, 1); options.Controls.Add(optionGrid); root.Controls.Add(options, 0, 3);
 
-            var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, BackColor = Color.Transparent };
-            actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
-            actions.RowStyles.Add(new RowStyle(SizeType.Absolute, 46)); actions.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
-            var mainActions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
-            toggle = ActionButton("▶  启动转发", true); save = ActionButton("保存设置", false); var test = ActionButton("测试连接", false); mainActions.Controls.Add(toggle); mainActions.Controls.Add(save); mainActions.Controls.Add(test);
-            actions.Controls.Add(mainActions, 0, 0); actions.SetColumnSpan(mainActions, 2);
-            var fileActions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.RightToLeft };
+            var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 2, BackColor = Color.Transparent, Margin = new Padding(0, 6, 0, 0) };
+            for (int i = 0; i < 3; i++) actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / 3));
+            actions.RowStyles.Add(new RowStyle(SizeType.Percent, 50)); actions.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            toggle = ActionButton("▶  启动转发", true); save = ActionButton("保存设置", false); var test = ActionButton("测试连接", false);
             var hide = ActionButton("收起到托盘", false); import = ActionButton("导入配置", false); var export = ActionButton("导出配置", false);
-            fileActions.Controls.Add(hide); fileActions.Controls.Add(export); fileActions.Controls.Add(import); actions.Controls.Add(fileActions, 0, 1); actions.SetColumnSpan(fileActions, 2);
+            actions.Controls.Add(toggle, 0, 0); actions.Controls.Add(save, 1, 0); actions.Controls.Add(test, 2, 0);
+            actions.Controls.Add(import, 0, 1); actions.Controls.Add(export, 1, 1); actions.Controls.Add(hide, 2, 1);
+            foreach (Control button in actions.Controls) { button.Dock = DockStyle.Fill; button.Margin = new Padding(3, 3, 3, 3); }
             root.Controls.Add(actions, 0, 4);
             import.Click += delegate { ImportSettings(); }; export.Click += delegate { ExportSettings(); };
             test.Click += delegate { try { var snapshot = Snapshot(); using (var dialog = new ConnectionTestForm(snapshot, engine != null && engine.Running)) dialog.ShowDialog(this); } catch (Exception e) { Feedback("测试前检查失败：" + e.Message, true); } };
 
             var feedbackPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
             feedbackPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70)); feedbackPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30));
-            feedback = new Label { AutoSize = false, Dock = DockStyle.Fill, ForeColor = Theme.Muted, Text = "准备就绪。修改设置后先保存，再启动转发。", TextAlign = ContentAlignment.MiddleLeft };
+            feedback = new Label { AutoSize = false, Dock = DockStyle.Fill, ForeColor = Theme.Muted, Text = "准备就绪。修改设置后先保存，再启动转发。", TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
             stats = new Label { AutoSize = false, Dock = DockStyle.Fill, Text = "0 个会话\r\n↑ 0 B   ↓ 0 B", ForeColor = Theme.Muted, TextAlign = ContentAlignment.MiddleRight };
             feedbackPanel.Controls.Add(feedback, 0, 0); feedbackPanel.Controls.Add(stats, 1, 0); root.Controls.Add(feedbackPanel, 0, 5);
 
@@ -193,10 +199,17 @@ namespace PortBridge {
             var logGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 }; logGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 28)); logGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             logGrid.Controls.Add(new Label { Text = "运行日志", Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold), ForeColor = Theme.Ink, AutoSize = true }, 0, 0);
             log = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, AccessibleName = "运行日志", Font = new Font("Microsoft YaHei UI", 9F) }; logGrid.Controls.Add(log, 0, 1); logPanel.Controls.Add(logGrid); root.Controls.Add(logPanel, 0, 6);
+            var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            string version = typeof(MainForm).Assembly.GetName().Version.ToString(3);
+            footer.Controls.Add(ProjectLink("PortBridge v" + version, "https://github.com/DTyun/PortBridge/releases", ContentAlignment.MiddleLeft, "当前版本 " + version + "，查看 GitHub 发布版本"), 0, 0);
+            footer.Controls.Add(ProjectLink("GitHub · github.com/DTyun/PortBridge", "https://github.com/DTyun/PortBridge", ContentAlignment.MiddleRight, "打开 PortBridge 的 GitHub 开源仓库"), 1, 0);
+            root.Controls.Add(footer, 0, 7);
             var menu = new ContextMenuStrip(); menu.Items.Add("打开主窗口", null, delegate { Restore(); });
             trayToggle = new ToolStripMenuItem("启动转发", null, delegate { Toggle(); }); menu.Items.Add(trayToggle); menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("退出软件", null, delegate { exiting = true; Close(); });
             tray = new NotifyIcon { Icon = Icon, Text = "端口中转 · 已暂停", ContextMenuStrip = menu, Visible = true };
+            SetStatusVisual(IconState.Paused);
             tray.DoubleClick += delegate { Restore(); };
             toggle.Click += delegate { Toggle(); }; save.Click += delegate { SaveSettings(); }; hide.Click += delegate { HideToTray(); };
             startup.CheckedChanged += delegate {
@@ -220,7 +233,22 @@ namespace PortBridge {
                 if (startHidden) HideToTray();
             };
         }
+        LinkLabel ProjectLink(string text, string address, ContentAlignment alignment, string accessibleName) {
+            var link = new LinkLabel { Text = text, Dock = DockStyle.Fill, TextAlign = alignment, LinkColor = Theme.Accent, ActiveLinkColor = Theme.Ink, VisitedLinkColor = Theme.Accent, LinkBehavior = LinkBehavior.HoverUnderline, AccessibleName = accessibleName, TabStop = true, Margin = new Padding(0) };
+            link.LinkClicked += delegate {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(address) { UseShellExecute = true }); }
+                catch (Exception e) { Feedback("无法打开浏览器，请手动访问 " + address + "。" + e.Message, true); }
+            };
+            return link;
+        }
         static Panel Card() { return new Panel { Dock = DockStyle.Fill, BackColor = Theme.Surface, BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(0) }; }
+        static Control LabeledField(string text, Control field) {
+            var row = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 46)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            row.Controls.Add(new Label { Text = text, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0), ForeColor = Theme.Muted }, 0, 0);
+            field.Anchor = AnchorStyles.Left | AnchorStyles.Right; field.Dock = DockStyle.None;
+            row.Controls.Add(field, 1, 0); return row;
+        }
         static TextBox Field(string value, string name) { return new TextBox { Text = value, Dock = DockStyle.Fill, Font = Theme.Data, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, AccessibleName = name, MaxLength = 64, Margin = new Padding(0, 3, 0, 3), Padding = new Padding(7, 4, 7, 4) }; }
         static NumericUpDown Port(int value, string name) { return new NumericUpDown { Minimum = 1, Maximum = 65535, Value = Math.Max(1, Math.Min(65535, value)), Dock = DockStyle.Fill, Font = Theme.Data, BackColor = Color.White, AccessibleName = name, Margin = new Padding(0, 3, 0, 3) }; }
         static CheckBox Check(string text, bool value) { return new CheckBox { Text = text, Checked = value, AutoSize = true, Cursor = Cursors.Hand, Margin = new Padding(0, 2, 15, 2) }; }
@@ -229,16 +257,6 @@ namespace PortBridge {
             button.FlatAppearance.BorderColor = primary ? Theme.Accent : Theme.Line; button.FlatAppearance.MouseOverBackColor = primary ? ColorTranslator.FromHtml("#2859B8") : Theme.AccentSoft; button.FlatAppearance.MouseDownBackColor = primary ? ColorTranslator.FromHtml("#204B9D") : ColorTranslator.FromHtml("#DCE7FF");
             return button;
         }
-        public static Icon MakeIcon() {
-            using (var bitmap = new Bitmap(32, 32)) using (var g = Graphics.FromImage(bitmap)) {
-                g.Clear(Theme.Accent); using (var pen = new Pen(Color.White, 3)) {
-                    g.DrawLines(pen, new Point[] { new Point(5, 11), new Point(26, 11), new Point(21, 6) });
-                    g.DrawLines(pen, new Point[] { new Point(27, 22), new Point(6, 22), new Point(11, 27) });
-                }
-                IntPtr handle = bitmap.GetHicon(); try { return (Icon)Icon.FromHandle(handle).Clone(); } finally { DestroyIcon(handle); }
-            }
-        }
-        [DllImport("user32.dll")] static extern bool DestroyIcon(IntPtr handle);
         static IPAddress Parse(string value) { if (value.Trim().Equals("localhost", StringComparison.OrdinalIgnoreCase)) return IPAddress.Loopback; IPAddress ip; if (!IPAddress.TryParse(value.Trim(), out ip)) throw new ArgumentException("地址请输入有效 IP（如 127.0.0.1 或 ::1），也可输入 localhost。"); return ip; }
         bool SaveSettings() {
             try {
@@ -282,6 +300,8 @@ namespace PortBridge {
                 engine.Dispose(); SetRunning(false); Feedback("已暂停，现有连接已关闭，监听端口已释放。", false); return;
             }
             if (!SaveSettings()) return;
+            SetStatusVisual(IconState.Starting);
+            status.Text = "正在启动"; status.ForeColor = Theme.Accent;
             var next = new RelayGroup();
             next.Log = delegate(string message) { if (messages.Count < 100) messages.Enqueue(message); };
             try {
@@ -291,12 +311,20 @@ namespace PortBridge {
         }
         void SetRunning(bool value) {
             toggle.Text = trayToggle.Text = value ? "■  暂停转发" : "▶  启动转发";
-            status.Text = value ? "●  正在转发" : "●  已暂停"; status.ForeColor = value ? Theme.Good : Theme.Muted;
+            status.Text = value ? "正在转发" : "已暂停"; status.ForeColor = value ? Theme.Good : Theme.Muted;
+            SetStatusVisual(value ? IconState.Running : IconState.Paused);
             tray.Text = value ? "端口中转 · 正在转发" : "端口中转 · 已暂停";
             foreach (Control control in new Control[] { listen, target, listenPort, targetPort, tcp, udp }) control.Enabled = !value;
             import.Enabled = !value;
         }
-        void Feedback(string text, bool error) { feedback.Text = text; feedback.ForeColor = error ? Theme.Error : Theme.Muted; AppendLog(text); }
+        void SetStatusVisual(IconState state) {
+            var old = Icon;
+            Icon = IconArtwork.CreateIcon(state, 32);
+            if (tray != null) tray.Icon = Icon;
+            if (statusGlyph != null) { var image = statusGlyph.Image; statusGlyph.Image = IconArtwork.CreateBitmap(state, 28); if (image != null) image.Dispose(); }
+            if (old != null) old.Dispose();
+        }
+        void Feedback(string text, bool error) { feedback.Text = text; feedback.ForeColor = error ? Theme.Error : Theme.Muted; if (error) SetStatusVisual(IconState.Failure); AppendLog(text); }
         void AppendLog(string text) { if (log.TextLength > 16000) log.Text = log.Text.Substring(log.TextLength - 10000); log.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + text + Environment.NewLine); }
         void HideToTray() { Hide(); ShowInTaskbar = false; }
         public void Restore() { ShowInTaskbar = true; Show(); WindowState = FormWindowState.Normal; Activate(); }
