@@ -128,7 +128,11 @@ class Tests {
                 var defaults = Settings.Read(Path.Combine(Environment.CurrentDirectory, "PortBridge.config.xml")); Assert(defaults.ListenPort == 7890 && defaults.TargetPort == 23578, "bundled example imports");
                 source.ListenPorts = "7890, 7891，7892"; source.SaveTo(configPath); loaded = Settings.Read(configPath);
                 Assert(loaded.GetListenPorts().SequenceEqual(new[] { 7890, 7891, 7892 }), "multiple ports config roundtrip and Chinese comma");
-                foreach (string bad in new[] { "", "7890,", "7890,,7891", "7890,7890", "0", "65536", "abc", "-1" }) {
+                source.ListenPorts = "7890"; source.SaveTo(configPath); loaded = Settings.Read(configPath);
+                Assert(loaded.GetListenPorts().SequenceEqual(new[] { 7890 }) && loaded.PortsText() == "7890", "single port export/import after multiple ports");
+                source.ListenPorts = "7890,"; source.SaveTo(configPath); loaded = Settings.Read(configPath);
+                Assert(loaded.GetListenPorts().SequenceEqual(new[] { 7890 }), "trailing comma after deleting second port still saves one");
+                foreach (string bad in new[] { "", ",", "7890,,", "7890,,7891", "7890,7890", "0", "65536", "abc", "-1" }) {
                     bool failed = false; try { new Settings { ListenPorts = bad }.Validate(); } catch (ArgumentException) { failed = true; }
                     Assert(failed, "reject invalid ports: " + bad);
                 }
@@ -206,6 +210,25 @@ class Tests {
                 form.Close(); Application.DoEvents(); Assert(!form.IsDisposed && !form.Visible, "window close keeps tray process alive");
                 typeof(MainForm).GetField("exiting", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(form, true); form.Close(); Assert(form.IsDisposed, "explicit exit disposes window");
             }
+            string uiSettingsPath = Path.Combine(Environment.CurrentDirectory, "ui-config-test-" + Guid.NewGuid().ToString("N") + ".xml");
+            try {
+                using (var form = new MainForm(false, new Settings { ListenPorts = "7890,7891", TargetPort = 25378, AutoRelay = false }, uiSettingsPath)) {
+                    form.Show(); Application.DoEvents();
+                    var field = (TextBox)typeof(MainForm).GetField("listenPort", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
+                    var saveButton = (Button)typeof(MainForm).GetField("save", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
+                    var feedbackLabel = (Label)typeof(MainForm).GetField("feedback", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
+                    field.Text = "7890"; saveButton.PerformClick(); Application.DoEvents();
+                    Assert(File.Exists(uiSettingsPath) && Settings.Read(uiSettingsPath).GetListenPorts().SequenceEqual(new[] { 7890 }) && feedbackLabel.Text == "设置已保存。", "single listening port saves through actual UI button");
+                    field.Text = "7890,7891"; saveButton.PerformClick(); Application.DoEvents();
+                    field.Text = "7891"; saveButton.PerformClick(); Application.DoEvents();
+                    Assert(Settings.Read(uiSettingsPath).GetListenPorts().SequenceEqual(new[] { 7891 }), "UI saves one port after saving multiple ports");
+                    field.Text = "7891,"; saveButton.PerformClick(); Application.DoEvents();
+                    Assert(Settings.Read(uiSettingsPath).GetListenPorts().SequenceEqual(new[] { 7891 }) && field.Text == "7891" && feedbackLabel.Text == "设置已保存。", "UI trims trailing comma and saves one port");
+                    field.Text = "7891,,7892"; saveButton.PerformClick(); Application.DoEvents();
+                    Assert(Settings.Read(uiSettingsPath).GetListenPorts().SequenceEqual(new[] { 7891 }) && feedbackLabel.Text.StartsWith("保存失败："), "invalid UI middle empty port keeps previous config");
+                    typeof(MainForm).GetField("exiting", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(form, true); form.Close();
+                }
+            } finally { if (File.Exists(uiSettingsPath)) File.Delete(uiSettingsPath); }
             using (var dialog = new ConnectionTestForm(new Settings { Tcp = false }, false)) {
                 dialog.Show(); var until = DateTime.UtcNow.AddSeconds(4); while (DateTime.UtcNow < until) { Application.DoEvents(); Thread.Sleep(10); }
                 using (var bitmap = new Bitmap(dialog.Width, dialog.Height)) { dialog.DrawToBitmap(bitmap, new Rectangle(Point.Empty, dialog.Size)); bitmap.Save("test-window-preview.png"); }

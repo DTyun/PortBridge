@@ -11,7 +11,7 @@ using System.Linq;
 using Microsoft.Win32;
 
 [assembly: System.Reflection.AssemblyTitle("端口中转 PortBridge")]
-[assembly: System.Reflection.AssemblyVersion("1.4.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.4.1.0")]
 namespace PortBridge {
     public class Settings {
         public string ListenAddress = "127.0.0.1";
@@ -19,8 +19,11 @@ namespace PortBridge {
         public string ListenPorts;
         public bool ShouldSerializeListenPort() { return ListenPorts == null; }
         public int[] GetListenPorts() {
-            string text = ListenPorts ?? ListenPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string[] parts = text.Replace('，', ',').Split(',');
+            string text = (ListenPorts ?? ListenPort.ToString(System.Globalization.CultureInfo.InvariantCulture)).Trim().Replace('，', ',');
+            // A user removing the last port from "7890,7891" often leaves "7890,".
+            // Treat one trailing separator as unfinished typing and save the remaining ports.
+            if (text.EndsWith(",", StringComparison.Ordinal)) text = text.Substring(0, text.Length - 1).TrimEnd();
+            string[] parts = text.Split(',');
             if (parts.Length > 64) throw new ArgumentException("最多同时监听 64 个端口。");
             var ports = new System.Collections.Generic.List<int>();
             foreach (string part in parts) {
@@ -103,13 +106,16 @@ namespace PortBridge {
         ToolStripMenuItem trayToggle;
         RelayGroup engine;
         Settings settings;
+        readonly string settingsPath;
         bool exiting, loading = true;
         readonly bool startHidden;
         readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
         readonly System.Collections.Concurrent.ConcurrentQueue<string> messages = new System.Collections.Concurrent.ConcurrentQueue<string>();
-        public MainForm(bool hidden) : this(hidden, null) { }
-        public MainForm(bool hidden, Settings initialSettings) {
+        public MainForm(bool hidden) : this(hidden, null, null) { }
+        public MainForm(bool hidden, Settings initialSettings) : this(hidden, initialSettings, null) { }
+        public MainForm(bool hidden, Settings initialSettings, string savePath) {
             startHidden = hidden;
+            settingsPath = savePath ?? Settings.FilePath;
             string loadError = null;
             try {
                 string bundled = Path.Combine(Application.StartupPath, "PortBridge.config.xml");
@@ -264,12 +270,12 @@ namespace PortBridge {
                 if (ip.Equals(IPAddress.Any) || ip.Equals(IPAddress.IPv6Any)) throw new ArgumentException("目标地址不能为 0.0.0.0 或 ::。");
                 if (!tcp.Checked && !udp.Checked) throw new ArgumentException("请至少选择 TCP 或 UDP。");
                 var next = Snapshot();
-                next.Save(); settings = next; Feedback("设置已保存。", false); return true;
+                next.SaveTo(settingsPath); settings = next; listenPort.Text = next.PortsText(); Feedback("设置已保存。", false); return true;
             } catch (Exception e) { Feedback("保存失败：" + e.Message, true); return false; }
         }
         Settings Snapshot() {
             var value = new Settings { ListenAddress = listen.Text.Trim(), ListenPorts = listenPort.Text.Trim(), TargetAddress = target.Text.Trim(), TargetPort = (int)targetPort.Value, Tcp = tcp.Checked, Udp = udp.Checked, AutoRelay = auto.Checked };
-            value.Validate(); return value;
+            value.Validate(); value.ListenPorts = value.PortsText(); return value;
         }
         void ImportSettings() {
             if (engine != null && engine.Running) { Feedback("请先暂停转发，再导入配置。", true); return; }
@@ -277,7 +283,7 @@ namespace PortBridge {
                 if (picker.ShowDialog(this) != DialogResult.OK) return;
                 try {
                     var value = Settings.Read(picker.FileName);
-                    value.Save(); settings = value;
+                    value.SaveTo(settingsPath); settings = value;
                     loading = true;
                     listen.Text = value.ListenAddress; listenPort.Text = value.PortsText(); target.Text = value.TargetAddress; targetPort.Value = value.TargetPort;
                     tcp.Checked = value.Tcp; udp.Checked = value.Udp; auto.Checked = value.AutoRelay;

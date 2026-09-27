@@ -1,5 +1,9 @@
 # v1.1 verification
 
+## v1.4.1 single-port save fix
+
+The settings parser, the real WinForms Save button, XML persistence and re-import were exercised with `7890`, with `7890,` left after removing a second port, and with switching from two ports to one. The trailing comma is now normalized on save. Empty middle entries and repeated ports remain invalid. The complete suite passed 74 checks.
+
 ## v1.3 update
 
 64 checks passed. Added multi-port TCP/UDP forwarding, aggregated counters, group stop/restart, failure on a later port with complete rollback, comma and Chinese comma parsing, invalid/duplicate/empty input rejection, multi-port XML roundtrip and legacy single-port compatibility. HTTP CONNECT and SOCKS5 diagnostics verify both listening ports; a missing second port correctly prevents an overall pass. Existing relay, config, native window and diagnostic checks remain passing.
