@@ -205,8 +205,16 @@ class Tests {
                 CheckLayout(form); Assert(true, "all form fields, labels and actions fit at 125 percent layout scale");
                 form.Scale(new SizeF(1.2F, 1.2F)); Application.DoEvents();
                 CheckLayout(form); Assert(true, "all form fields, labels and actions fit at 150 percent layout scale");
+                var addressField = (TextBox)typeof(MainForm).GetField("listen", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
+                var targetField = (TextBox)typeof(MainForm).GetField("target", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
+                var portField = (TextBox)typeof(MainForm).GetField("listenPort", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
+                typeof(MainForm).GetMethod("SetRunning", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(form, new object[] { true });
+                Assert(addressField.Enabled && targetField.Enabled && portField.Enabled && addressField.ReadOnly && targetField.ReadOnly && portField.ReadOnly, "running route text stays paintable and read-only");
                 form.WindowState = FormWindowState.Minimized; Application.DoEvents(); Assert(!form.Visible, "minimize hides to tray");
                 form.Restore(); Application.DoEvents(); Assert(form.Visible && form.WindowState == FormWindowState.Normal, "restore from tray");
+                Assert(addressField.Text == "127.0.0.1" && targetField.Text == "127.0.0.1" && portField.Text == "7890,7891,7892", "route text survives tray restore");
+                typeof(MainForm).GetMethod("SetRunning", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(form, new object[] { false });
+                Assert(!addressField.ReadOnly && !targetField.ReadOnly && !portField.ReadOnly, "route text is editable after pausing");
                 form.Close(); Application.DoEvents(); Assert(!form.IsDisposed && !form.Visible, "window close keeps tray process alive");
                 typeof(MainForm).GetField("exiting", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(form, true); form.Close(); Assert(form.IsDisposed, "explicit exit disposes window");
             }

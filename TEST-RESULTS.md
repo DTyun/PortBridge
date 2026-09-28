@@ -1,5 +1,9 @@
 # v1.1 verification
 
+## 2026-09-28 tray restore display fix
+
+Running route address and listening-port text boxes now remain paintable and read-only. Restoring the main window resets their text display position so the full address or port list remains visible. The complete suite passed 77 checks, including minimize/restore and editability after pausing.
+
 ## v1.4.1 single-port save fix
 
 The settings parser, the real WinForms Save button, XML persistence and re-import were exercised with `7890`, with `7890,` left after removing a second port, and with switching from two ports to one. The trailing comma is now normalized on save. Empty middle entries and repeated ports remain invalid. The complete suite passed 74 checks.

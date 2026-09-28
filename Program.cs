@@ -320,7 +320,11 @@ namespace PortBridge {
             status.Text = value ? "正在转发" : "已暂停"; status.ForeColor = value ? Theme.Good : Theme.Muted;
             SetStatusVisual(value ? IconState.Running : IconState.Paused);
             tray.Text = value ? "端口中转 · 正在转发" : "端口中转 · 已暂停";
-            foreach (Control control in new Control[] { listen, target, listenPort, targetPort, tcp, udp }) control.Enabled = !value;
+            foreach (TextBox field in new[] { listen, target, listenPort }) {
+                field.ReadOnly = value;
+                if (value) { field.SelectionStart = 0; field.SelectionLength = 0; }
+            }
+            foreach (Control control in new Control[] { targetPort, tcp, udp }) control.Enabled = !value;
             import.Enabled = !value;
         }
         void SetStatusVisual(IconState state) {
@@ -333,7 +337,18 @@ namespace PortBridge {
         void Feedback(string text, bool error) { feedback.Text = text; feedback.ForeColor = error ? Theme.Error : Theme.Muted; if (error) SetStatusVisual(IconState.Failure); AppendLog(text); }
         void AppendLog(string text) { if (log.TextLength > 16000) log.Text = log.Text.Substring(log.TextLength - 10000); log.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + text + Environment.NewLine); }
         void HideToTray() { Hide(); ShowInTaskbar = false; }
-        public void Restore() { ShowInTaskbar = true; Show(); WindowState = FormWindowState.Normal; Activate(); }
+        public void Restore() {
+            ShowInTaskbar = true;
+            Show();
+            WindowState = FormWindowState.Normal;
+            if (engine != null && engine.Running) {
+                foreach (TextBox field in new[] { listen, target, listenPort }) {
+                    field.SelectionStart = 0;
+                    field.SelectionLength = 0;
+                }
+            }
+            Activate();
+        }
         protected override void WndProc(ref Message m) { if (m.Msg == Program.ShowMessage) Restore(); base.WndProc(ref m); }
         static string SizeText(long bytes) { if (bytes < 1024) return bytes + " B"; if (bytes < 1048576) return (bytes / 1024.0).ToString("F1") + " KB"; return (bytes / 1048576.0).ToString("F1") + " MB"; }
     }
