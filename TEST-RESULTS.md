@@ -26,3 +26,7 @@ Redesigned the main WinForms screen for beginner use: explicit numbered route st
 - Restricted execution initially failed at Windows TLS credential access; normal-user verification succeeded without any certificate-validation bypass.
 - Existing running v1.0 was not stopped or replaced. Updated executable is `dist/PortBridge-v1.1.exe`. The user must exit v1.0 from its tray menu before launching v1.1 because the app is single-instance.
 - Diagnostic scope: TCP HTTP/HTTPS through HTTP CONNECT or unauthenticated SOCKS5. It does not verify UDP, authenticated proxy setups, or reachability of every external website.
+
+## 2026-09-30 verification
+
+Windows build and full regression suite passed 81 checks, including 32 TCP connections per source and release of the quota after disconnect. Main-window and connection-test screenshots were regenerated. The connection-test screenshot shows the suite's intentional UDP-only failure case. .NET 8 CLI and iOS projects could not be built here because the .NET SDK is not installed; iOS additionally requires a Mac with Xcode and MAUI workload.

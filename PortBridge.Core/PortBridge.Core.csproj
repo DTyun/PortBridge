@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Settings.cs" Link="Settings.cs" />
+    <Compile Include="..\RelayEngine.cs" Link="RelayEngine.cs" />
+  </ItemGroup>
+</Project>

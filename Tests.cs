@@ -37,6 +37,28 @@ class Tests {
         throw new Exception("No TCP/UDP test port available");
     }
     static RelayEngine Start(int port, int target, bool tcp, bool udp) { var e = new RelayEngine(); e.Log = s => Console.WriteLine("RELAY " + s); e.Start(IPAddress.Loopback, port, IPAddress.Loopback, target, tcp, udp); return e; }
+    static void TcpSourceLimit() {
+        int targetPort = FreePort(), entryPort = FreePort();
+        var target = new TcpListener(IPAddress.Loopback, targetPort); target.Start(64);
+        var held = new System.Collections.Generic.List<TcpClient>();
+        var targetSide = new System.Collections.Generic.List<TcpClient>();
+        try {
+            using (var relay = Start(entryPort, targetPort, true, false)) {
+                for (int i = 0; i < 32; i++) { var client = new TcpClient(); client.Connect(IPAddress.Loopback, entryPort); held.Add(client); targetSide.Add(target.AcceptTcpClient()); }
+                Assert(SpinWait.SpinUntil(() => relay.Connections == 32, 5000), "32 TCP connections from one source admitted");
+                using (var extra = new TcpClient()) {
+                    extra.Connect(IPAddress.Loopback, entryPort); extra.ReceiveTimeout = 2000;
+                    Assert(extra.GetStream().ReadByte() == -1, "33rd idle TCP connection from one source rejected");
+                }
+                held[0].Close(); targetSide[0].Close();
+                Assert(SpinWait.SpinUntil(() => relay.Connections == 31, 5000), "closed TCP connection releases source quota");
+                using (var replacement = new TcpClient()) {
+                    replacement.Connect(IPAddress.Loopback, entryPort);
+                    Assert(SpinWait.SpinUntil(() => relay.Connections == 32, 5000), "new TCP connection admitted after quota release");
+                }
+            }
+        } finally { foreach (var client in held) client.Close(); foreach (var client in targetSide) client.Close(); target.Stop(); }
+    }
     static void TcpRoundtrip(int port, int seed) {
         using (var c = new TcpClient()) {
             c.Connect(IPAddress.Loopback, port); c.ReceiveTimeout = c.SendTimeout = 5000;
@@ -113,6 +135,7 @@ class Tests {
     [STAThread] static int Main() {
         try {
             ThreadPool.SetMinThreads(32, 32);
+            TcpSourceLimit();
             string configPath = Path.Combine(Environment.CurrentDirectory, "config-test-" + Guid.NewGuid().ToString("N") + ".xml");
             try {
                 var source = new Settings { ListenAddress = "::1", ListenPort = 12345, TargetAddress = "127.0.0.1", TargetPort = 25378, Tcp = true, Udp = false, AutoRelay = true };

@@ -1,9 +1,34 @@
 # PortBridge
 
-一款面向 Windows 11 的轻量级本地端口中转工具。它把一个或多个本机端口的 TCP/UDP 流量转发到同一个目标服务，适合本地代理端口、开发服务和临时网络链路。
+一款开源的本地端口中转工具。它把一个或多个本机端口的 TCP/UDP 流量转发到同一个目标服务，适合本地代理端口、开发服务和临时网络链路。提供 Windows 10/11 桌面版、Windows/Linux 命令行工程，以及 iOS 前台应用工程。
 
 [![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?logo=windows&logoColor=white)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2F6FEB.svg)](LICENSE)
+
+## 平台与构建状态
+
+| 平台 | 入口 | 状态 |
+| --- | --- | --- |
+| Windows 10/11 | WinForms 桌面版 | Windows 11 环境已通过 81 项回归测试；Windows 10 尚需实机验证 |
+| Windows 10/11、Linux | .NET 8 命令行版 | 已提供源码工程；本机没有 .NET SDK，尚未完成编译和实机验证 |
+| iOS 15+ | .NET MAUI 前台应用 | 已提供源码工程；需要 Mac、Xcode 和 iOS 工作负载构建，尚未完成设备验证 |
+
+### Windows / Linux 命令行版
+
+安装 .NET 8 SDK 后，在仓库根目录执行：
+
+```sh
+dotnet build PortBridge.Cli/PortBridge.Cli.csproj -c Release
+dotnet run --project PortBridge.Cli/PortBridge.Cli.csproj -- --config PortBridge.config.xml
+```
+
+省略 `--config` 时，程序读取用户本地配置；配置不存在则使用默认值。按 Ctrl+C 停止。Linux 服务器可使用 systemd 等服务管理器运行已发布的命令行程序。配置文件 XML 格式与 Windows 桌面版兼容。可按目标系统发布，例如 `dotnet publish PortBridge.Cli/PortBridge.Cli.csproj -c Release -r linux-x64 --self-contained true`，Windows x64 则使用 `win-x64`。
+
+### iOS 前台应用
+
+在装有 Xcode、.NET 8 SDK 和 MAUI iOS 工作负载的 Mac 上构建 `PortBridge.iOS/PortBridge.iOS.csproj`，并使用自己的 Apple 签名身份安装到设备。应用可填写监听地址、多个端口、目标及 TCP/UDP 选项。进入后台时会停止转发；iOS 不允许此类普通应用保证持续后台监听。若需从局域网访问手机上的监听端口，应填写手机的局域网 IP，并允许本地网络权限；蜂窝网络和系统防火墙/路由策略可能阻止入站连接。
+
+所有源码采用 MIT 许可证。`PortBridge.Core` 为共享配置和 TCP/UDP 转发核心；各平台入口只负责界面和运行生命周期。
 
 ## 界面预览
 
@@ -57,7 +82,7 @@ v1.4 重新整理了主窗口：先看懂“本机入口 → 目标服务”，�
 - 本功能验证 TCP 网页链路，不证明 UDP 或全部网站可用。目标如果不是 HTTP/SOCKS5 代理，网页测试可能不适用。认证代理暂不支持输入用户名密码。
 - 升级后如果需要开机启动，重新取消并勾选该选项，将启动路径更新到新版 exe。
 
-这是 TCP/UDP 字节转发工具，不会转换 HTTP/SOCKS 协议，也不会自动捕获全电脑流量。如果 23578 是代理服务，7890 会转发到该代理；使用方需要采用目标代理支持的协议。TCP 支持半关闭；UDP 按来源地址映射回传，闲置 60–70 秒后回收，每种协议最多 256 个会话。
+这是 TCP/UDP 字节转发工具，不会转换 HTTP/SOCKS 协议，也不会自动捕获全电脑流量。如果 23578 是代理服务，7890 会转发到该代理；使用方需要采用目标代理支持的协议。TCP 支持半关闭，单个来源 IP 最多同时建立 32 条连接，连接连续 2 分钟没有转发数据时回收；UDP 按来源地址映射回传，闲置 60–70 秒后回收，每种协议最多 256 个会话。监听非本机地址时，能连到监听端口的设备也能访问目标服务，请配合防火墙限制来源。
 
 ## 设置与移除
 
@@ -93,7 +118,7 @@ v1.4 重新整理了主窗口：先看懂“本机入口 → 目标服务”，�
 
 构建会生成 `assets/` 中的桌面与状态 ICO，将桌面图标嵌入 exe，并更新 `dist/PortBridge-Win11-v1.4.1.zip`（含 exe、配置示例和图标文件）。主程序位于 `dist/PortBridge-v1.4.1.exe`。
 
-`test.ps1` 会运行 77 项检查，覆盖多端口 TCP/UDP 转发、端口冲突回滚、配置导入导出、HTTP CONNECT/SOCKS5 外网诊断、暂停重启、托盘窗口行为、恢复后地址和端口内容，以及 100%、125%、150% 程序化布局缩放下的控件遮挡检查。
+`test.ps1` 会运行 81 项检查，覆盖多端口 TCP/UDP 转发、端口冲突回滚、配置导入导出、HTTP CONNECT/SOCKS5 外网诊断、暂停重启、托盘窗口行为、恢复后地址和端口内容，以及 100%、125%、150% 程序化布局缩放下的控件遮挡检查。
 
 ## 项目结构
 

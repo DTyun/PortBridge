@@ -34,6 +34,7 @@ namespace PortBridge {
     }
     public sealed class RelayEngine : IDisposable {
         readonly ConcurrentDictionary<TcpClient, byte> clients = new ConcurrentDictionary<TcpClient, byte>();
+        readonly System.Collections.Generic.Dictionary<IPAddress, int> tcpSourceCounts = new System.Collections.Generic.Dictionary<IPAddress, int>();
         readonly ConcurrentDictionary<string, UdpSession> sessions = new ConcurrentDictionary<string, UdpSession>();
         readonly CancellationTokenSource cancel = new CancellationTokenSource();
         TcpListener tcp;
@@ -42,6 +43,8 @@ namespace PortBridge {
         IPEndPoint destination;
         long sent, received;
         int active;
+        const int MaxTcpConnectionsPerSource = 32;
+        static readonly long TcpIdleTicks = TimeSpan.FromMinutes(2).Ticks;
         public Action<string> Log;
         public long Sent { get { return Interlocked.Read(ref sent); } }
         public long Received { get { return Interlocked.Read(ref received); } }
@@ -51,6 +54,10 @@ namespace PortBridge {
             public UdpClient Socket;
             public IPEndPoint Source;
             public long Last;
+        }
+        sealed class TcpActivity {
+            public long Last = DateTime.UtcNow.Ticks;
+            public volatile bool Expired;
         }
         void Report(string message) { var log = Log; if (log != null && !cancel.IsCancellationRequested) log(message); }
         public void Start(IPAddress bind, int port, IPAddress target, int targetPort, bool useTcp, bool useUdp) {
@@ -81,20 +88,42 @@ namespace PortBridge {
                 try {
                     var incoming = await tcp.AcceptTcpClientAsync().ConfigureAwait(false);
                     if (cancel.IsCancellationRequested || Volatile.Read(ref active) >= 256) { incoming.Close(); continue; }
+                    var sourceAddress = ((IPEndPoint)incoming.Client.RemoteEndPoint).Address;
+                    if (sourceAddress.IsIPv4MappedToIPv6) sourceAddress = sourceAddress.MapToIPv4();
+                    if (!AdmitTcpSource(sourceAddress)) { incoming.Close(); continue; }
                     Interlocked.Increment(ref active);
                     clients.TryAdd(incoming, 0);
-                    var ignored = Forward(incoming);
+                    var ignored = Forward(incoming, sourceAddress);
                 } catch (Exception e) {
                     if (!cancel.IsCancellationRequested) Report("TCP 监听异常：" + e.Message);
                 }
                 if (!cancel.IsCancellationRequested) await Task.Delay(1).ConfigureAwait(false);
             }
         }
-        async Task Forward(TcpClient source) {
-            var target = new TcpClient(destination.AddressFamily);
-            clients.TryAdd(target, 0);
+        bool AdmitTcpSource(IPAddress address) {
+            lock (tcpSourceCounts) {
+                int count;
+                tcpSourceCounts.TryGetValue(address, out count);
+                if (count >= MaxTcpConnectionsPerSource) return false;
+                tcpSourceCounts[address] = count + 1;
+                return true;
+            }
+        }
+        void ReleaseTcpSource(IPAddress address) {
+            lock (tcpSourceCounts) {
+                int count = tcpSourceCounts[address] - 1;
+                if (count == 0) tcpSourceCounts.Remove(address);
+                else tcpSourceCounts[address] = count;
+            }
+        }
+        async Task Forward(TcpClient source, IPAddress sourceAddress) {
+            TcpClient target = null;
+            Timer idleSweep = null;
+            var activity = new TcpActivity();
             try {
                 if (cancel.IsCancellationRequested) return;
+                target = new TcpClient(destination.AddressFamily);
+                clients.TryAdd(target, 0);
                 source.NoDelay = target.NoDelay = true;
                 var connect = target.ConnectAsync(destination.Address, destination.Port);
                 if (await Task.WhenAny(connect, Task.Delay(10000, cancel.Token)).ConfigureAwait(false) != connect) {
@@ -107,20 +136,26 @@ namespace PortBridge {
                 // Capture both streams before either pump can half-close a socket.
                 var sourceStream = source.GetStream();
                 var targetStream = target.GetStream();
-                var up = Copy(sourceStream, targetStream, target.Client, true);
-                var down = Copy(targetStream, sourceStream, source.Client, false);
+                idleSweep = new Timer(state => {
+                    if (DateTime.UtcNow.Ticks - Interlocked.Read(ref activity.Last) <= TcpIdleTicks) return;
+                    activity.Expired = true;
+                    source.Close(); target.Close();
+                }, null, 10000, 10000);
+                var up = Copy(sourceStream, targetStream, target.Client, true, activity);
+                var down = Copy(targetStream, sourceStream, source.Client, false, activity);
                 var first = await Task.WhenAny(up, down).ConfigureAwait(false);
                 if (first.IsFaulted || first.IsCanceled) { source.Close(); target.Close(); }
                 await Task.WhenAll(up, down).ConfigureAwait(false);
-            } catch (Exception e) { Report("TCP 转发失败：" + e.Message); }
-            finally { byte value; clients.TryRemove(source, out value); clients.TryRemove(target, out value); source.Close(); target.Close(); Interlocked.Decrement(ref active); }
+            } catch (Exception e) { if (!activity.Expired) Report("TCP 转发失败：" + e.Message); }
+            finally { if (idleSweep != null) idleSweep.Dispose(); byte value; clients.TryRemove(source, out value); if (target != null) clients.TryRemove(target, out value); source.Close(); if (target != null) target.Close(); ReleaseTcpSource(sourceAddress); Interlocked.Decrement(ref active); }
         }
-        async Task Copy(NetworkStream input, NetworkStream output, Socket outputSocket, bool upload) {
+        async Task Copy(NetworkStream input, NetworkStream output, Socket outputSocket, bool upload, TcpActivity activity) {
             byte[] buffer = new byte[32768];
             while (true) {
                 int count = await input.ReadAsync(buffer, 0, buffer.Length, cancel.Token).ConfigureAwait(false);
-                if (count == 0) { try { outputSocket.Shutdown(SocketShutdown.Send); } catch (SocketException) { } return; }
+                if (count == 0) { try { outputSocket.Shutdown(SocketShutdown.Send); } catch (SocketException) { } catch (ObjectDisposedException) { } return; }
                 await output.WriteAsync(buffer, 0, count, cancel.Token).ConfigureAwait(false);
+                Interlocked.Exchange(ref activity.Last, DateTime.UtcNow.Ticks);
                 if (upload) Interlocked.Add(ref sent, count); else Interlocked.Add(ref received, count);
             }
         }

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>org.portbridge.app</string>
+  <key>CFBundleDisplayName</key><string>PortBridge</string>
+  <key>LSRequiresIPhoneOS</key><true/>
+  <key>NSLocalNetworkUsageDescription</key><string>用于在本机和局域网中转 TCP 与 UDP 连接。</string>
+</dict></plist>
